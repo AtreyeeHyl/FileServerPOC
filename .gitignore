@@ -1,0 +1,36 @@
+# Build directories (auto-generated during compilation)
+bin/
+obj/
+
+# User-specific files (Visual Studio and project-specific settings)
+*.user
+*.suo
+*.csproj.user
+
+# Visual Studio working folders
+.vs/
+.vscode/
+
+# SQLite database files (local database and temporary files)
+fileServer.db
+fileServer.db-shm
+fileServer.db-wal
+
+# Entity Framework Core Migrations Snapshots
+Migrations/*Snapshot.cs
+
+# IDE-specific settings and configurations
+.idea/
+*.iml
+
+# HTTP testing/debugging files
+FileServer_POC.http
+
+# Temporary or miscellaneous files
+*.tmp
+*.temp
+
+# Uploads directory (environment-specific files)
+uploads/
+
+
