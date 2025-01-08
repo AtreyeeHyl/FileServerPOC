@@ -17,7 +17,7 @@ fileServer.db-shm
 fileServer.db-wal
 
 # Entity Framework Core Migrations Snapshots
-Migrations/*Snapshot.cs
+Migrations/
 
 # IDE-specific settings and configurations
 .idea/
