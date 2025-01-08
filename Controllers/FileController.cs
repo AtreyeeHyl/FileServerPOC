@@ -58,9 +58,13 @@ namespace FileServer_POC.Controllers
             if (!System.IO.File.Exists(metadata.FilePath))
                 return NotFound(new { Message = "File not found on the server." });
 
-            using FileStream fileStream = new FileStream(metadata.FilePath, FileMode.Open, FileAccess.Read);
+            FileStream fileStream = new FileStream(metadata.FilePath, FileMode.Open, FileAccess.Read);
+            return new FileStreamResult(fileStream, "application/octet-stream")
+            {
+                FileDownloadName = metadata.FileName
+            };
 
-            return File(fileStream, "application/octet-stream", metadata.FileName);
+            //return File(fileStream, "application/octet-stream", metadata.FileName);
         }
 
     }
