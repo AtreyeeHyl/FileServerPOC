@@ -1,12 +1,15 @@
 using FileServer_POC.Entities;
+using FileServer_POC.Repositories;
+using FileServer_POC.Services;
 using Microsoft.EntityFrameworkCore;
 using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
 builder.Services.AddControllers();
+builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<IFileRepository, FileRepository>();
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite("Data Source=fileServer.db"));
