@@ -64,7 +64,6 @@ namespace FileServer_POC.Controllers
                 FileDownloadName = metadata.FileName
             };
 
-            //return File(fileStream, "application/octet-stream", metadata.FileName);
         }
 
     }
