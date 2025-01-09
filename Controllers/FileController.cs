@@ -15,7 +15,7 @@ namespace FileServer_POC.Controllers
         }
 
         [HttpPost]
-        [Route("upload")]
+        [Route("")]
         public async Task<ActionResult> UploadFiles([FromForm] List<IFormFile> files)
         {
             if (files == null || files.Count == 0)
@@ -35,6 +35,18 @@ namespace FileServer_POC.Controllers
             return Ok(new { Message = "All files uploaded successfully." });
         }
 
+        [HttpGet]
+        [Route("")]
+        public async Task<IActionResult> GetAllFiles()
+        {
+            var files = await _fileService.GetAllFilesAsync();
+
+            if (files == null || files.Count == 0)
+                return NotFound("No files found.");
+
+            return Ok(files);
+        }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetFileById(int id)
         {
@@ -47,7 +59,7 @@ namespace FileServer_POC.Controllers
         }
 
         [HttpDelete]
-        [Route("delete")]
+        [Route("")]
         public async Task<IActionResult> DeleteFiles([FromBody] int[] ids)
         {
             var result = await _fileService.DeleteFilesAndMetadataAsync(ids);

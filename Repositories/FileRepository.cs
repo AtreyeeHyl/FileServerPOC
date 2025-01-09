@@ -13,6 +13,11 @@ namespace FileServer_POC.Repositories
             _context = context;
         }
 
+        public async Task<List<FileMetadata>> GetAllMetadataAsync()
+        {
+            return await _context.FileMetadata.ToListAsync();
+        }
+
         //returns single value
         public async Task<FileMetadata> GetMetadataByIdAsync(int id)
         {

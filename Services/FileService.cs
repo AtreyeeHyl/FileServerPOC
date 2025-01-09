@@ -60,6 +60,20 @@ namespace FileServer_POC.Services
             };
         }
 
+        public async Task<List<GetAllFilesResponse>> GetAllFilesAsync()
+        {
+            var files = await _fileRepository.GetAllMetadataAsync();
+
+            return files.Select(file => new GetAllFilesResponse
+            {
+                FileId = file.Id,
+                FileName = file.FileName,
+                FilePath = file.FilePath,
+                FileSize = file.FileSize,
+                UploadDate = file.UploadDate
+            }).ToList();
+        }
+
         public async Task<GetFileByIdResponse> GetFileByIdAsync(int id)
         {
             var metadata = await _fileRepository.GetMetadataByIdAsync(id);
