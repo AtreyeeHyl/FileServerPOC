@@ -1,7 +1,5 @@
 ﻿using FileServer_POC.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
 
 namespace FileServer_POC.Controllers
 {
@@ -37,7 +35,6 @@ namespace FileServer_POC.Controllers
             return Ok(new { Message = "All files uploaded successfully." });
         }
 
-
         [HttpGet("{id}")]
         public async Task<IActionResult> GetFileById(int id)
         {
@@ -55,9 +52,7 @@ namespace FileServer_POC.Controllers
         {
             var result = await _fileService.DeleteFilesAndMetadataAsync(ids);
 
-            var successfullyDeleted = ids.Except(result.Errors
-            .Where(e => e.FileId.HasValue)
-            .Select(e => e.FileId.Value))
+            var successfullyDeleted = ids.Except(result.Errors.Select(e => e.FileId))
             .ToList();
 
             return StatusCode(StatusCodes.Status207MultiStatus, new
