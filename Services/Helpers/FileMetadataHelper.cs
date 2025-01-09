@@ -18,6 +18,7 @@ namespace FileServer_POC.Helpers
             var metadata = new FileMetadata
             {
                 FileName = fileName,
+                FileType = Path.GetExtension(fileName),
                 FilePath = filePath,
                 FileSize = fileSize,
                 UploadDate = DateTime.UtcNow
@@ -26,7 +27,7 @@ namespace FileServer_POC.Helpers
             await _fileRepository.SaveMetadataAsync(metadata);
         }
 
-        public async Task DeleteMetadataAsync(int metadataId, FileOperationResponse result)
+        public async Task DeleteMetadataAsync(int metadataId, FileOperationDTO result)
         {
             try
             {
@@ -34,7 +35,7 @@ namespace FileServer_POC.Helpers
             }
             catch (Exception ex)
             {
-                result.Errors.Add(new FileError
+                result.Errors.Add(new FileErrorDTO
                 {
                     FileId = metadataId,
                     ErrorMessage = $"Error deleting metadata: {ex.Message}"

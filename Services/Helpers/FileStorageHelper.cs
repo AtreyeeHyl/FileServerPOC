@@ -15,7 +15,7 @@ namespace FileServer_POC.Services.Utilities
             return uploadDirPath;
         }
 
-        public async Task SaveRegularFileAsync(IFormFile file, string uploadDirPath, List<FileError> errors, FileMetadataHelper metadataHelper)
+        public async Task SaveRegularFileAsync(IFormFile file, string uploadDirPath, List<FileErrorDTO> errors, FileMetadataHelper metadataHelper)
         {
             try
             {
@@ -28,7 +28,7 @@ namespace FileServer_POC.Services.Utilities
             }
             catch (Exception ex)
             {
-                errors.Add(new FileError
+                errors.Add(new FileErrorDTO
                 {
                     FileName = file.FileName,
                     ErrorMessage = ex.Message
@@ -36,7 +36,7 @@ namespace FileServer_POC.Services.Utilities
             }
         }
 
-        public bool DeleteFile(string filePath, int metadataId, FileOperationResponse result)
+        public bool DeleteFile(string filePath, int metadataId, FileOperationDTO result)
         {
             try
             {
@@ -47,7 +47,7 @@ namespace FileServer_POC.Services.Utilities
                 }
                 else
                 {
-                    result.Errors.Add(new FileError
+                    result.Errors.Add(new FileErrorDTO
                     {
                         FileId = metadataId,
                         ErrorMessage = "File not found on disk."
@@ -57,7 +57,7 @@ namespace FileServer_POC.Services.Utilities
             }
             catch (Exception ex)
             {
-                result.Errors.Add(new FileError
+                result.Errors.Add(new FileErrorDTO
                 {
                     FileId = metadataId,
                     ErrorMessage = $"Error deleting file: {ex.Message}"

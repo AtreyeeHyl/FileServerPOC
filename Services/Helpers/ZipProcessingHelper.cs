@@ -14,7 +14,7 @@ namespace FileServer_POC.Services.Utilities
             _fileMetadataHelper = fileMetadataHelper;
         }
 
-        public async Task ProcessZipFileAsync(IFormFile zipFile, string uploadDirPath, List<FileError> errors)
+        public async Task ProcessZipFileAsync(IFormFile zipFile, string uploadDirPath, List<FileErrorDTO> errors)
         {
             var tempZipPath = Path.Combine(uploadDirPath, zipFile.FileName);
             using (var zipStream = new FileStream(tempZipPath, FileMode.Create))
@@ -35,7 +35,7 @@ namespace FileServer_POC.Services.Utilities
             }
             catch (Exception ex)
             {
-                errors.Add(new FileError
+                errors.Add(new FileErrorDTO
                 {
                     FileName = zipFile.FileName,
                     ErrorMessage = $"Failed to extract ZIP file: {ex.Message}"

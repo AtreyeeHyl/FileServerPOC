@@ -14,6 +14,7 @@ namespace FileServer_POC.Controllers
             _fileService = fileService;
         }
 
+        //Upload Files Single or Multiple
         [HttpPost]
         [Route("")]
         public async Task<ActionResult> UploadFiles([FromForm] List<IFormFile> files)
@@ -35,11 +36,13 @@ namespace FileServer_POC.Controllers
             return Ok(new { Message = "All files uploaded successfully." });
         }
 
+
+        //Get Multiple Files Details Using Filters
         [HttpGet]
-        [Route("")]
-        public async Task<IActionResult> GetAllFiles()
+        [Route("AllFiles")]
+        public async Task<IActionResult> GetAllFiles([FromQuery] string? filterOn, [FromQuery] string? filterQuery)
         {
-            var files = await _fileService.GetAllFilesAsync();
+            var files = await _fileService.GetAllFilesAsync(filterOn,filterQuery);
 
             if (files == null || files.Count == 0)
                 return NotFound("No files found.");
@@ -47,6 +50,8 @@ namespace FileServer_POC.Controllers
             return Ok(files);
         }
 
+
+        //Download Single file using ID
         [HttpGet("{id}")]
         public async Task<IActionResult> GetFileById(int id)
         {
@@ -58,6 +63,8 @@ namespace FileServer_POC.Controllers
             return File(result.FileStream, "application/octet-stream", result.FileName);
         }
 
+
+        //Delete Single or Multiple files using ID
         [HttpDelete]
         [Route("")]
         public async Task<IActionResult> DeleteFiles([FromBody] int[] ids)

@@ -2,6 +2,7 @@
 using FileServer_POC.Repositories;
 using FileServer_POC.Services.Utilities;
 using FileServer_POC.Helpers;
+using Microsoft.AspNetCore.Mvc;
 
 namespace FileServer_POC.Services
 {
@@ -22,9 +23,9 @@ namespace FileServer_POC.Services
             _zipProcessingHelper = new ZipProcessingHelper(_fileStorageHelper, _fileMetadataHelper);
         }
 
-        public async Task<FileOperationResponse> UploadFilesAsync(List<IFormFile> files)
+        public async Task<FileOperationDTO> UploadFilesAsync(List<IFormFile> files)
         {
-            var errors = new List<FileError>();
+            var errors = new List<FileErrorDTO>();
             var uploadDirPath = _fileStorageHelper.EnsureUploadDirectoryExists();
 
             foreach (var file in files)
@@ -44,7 +45,7 @@ namespace FileServer_POC.Services
                 }
                 catch (Exception ex)
                 {
-                    errors.Add(new FileError
+                    errors.Add(new FileErrorDTO
                     {
                         FileName = file.FileName,
                         ErrorMessage = ex.Message
@@ -52,7 +53,7 @@ namespace FileServer_POC.Services
                 }
             }
 
-            return new FileOperationResponse
+            return new FileOperationDTO
             {
                 Success = errors.Count == 0,
                 Message = errors.Count == 0 ? "All files uploaded successfully." : "Partial success in file upload.",
@@ -60,21 +61,37 @@ namespace FileServer_POC.Services
             };
         }
 
-        public async Task<List<GetAllFilesResponse>> GetAllFilesAsync()
+        public async Task<List<GetFileDTO>> GetAllFilesAsync([FromQuery] string? filterOn = null, [FromQuery] string? filterQuery = null)
         {
             var files = await _fileRepository.GetAllMetadataAsync();
 
-            return files.Select(file => new GetAllFilesResponse
+            // Apply filtering if parameters are provided
+            if (!string.IsNullOrEmpty(filterOn) && !string.IsNullOrEmpty(filterQuery))
+            {
+                files = filterOn.ToLower() switch
+                {
+                    "filename" => files.Where(file => file.FileName != null && file.FileName.Contains(filterQuery, StringComparison.OrdinalIgnoreCase)).ToList(),
+                    "filesize" => int.TryParse(filterQuery, out var maxSize)
+                    ? files.Where(file => file.FileSize <= maxSize).ToList()
+                    : files, // If parsing fails, return original list
+                    "filetype" => files.Where(file => file.FileType != null && file.FileType.Contains(filterQuery, StringComparison.OrdinalIgnoreCase)).ToList(),
+                    _ => files // If the filterOn value is not recognized, return the original list
+                };
+            }
+
+            //Convert to DTO
+            return files.Select(file => new GetFileDTO
             {
                 FileId = file.Id,
                 FileName = file.FileName,
+                FileType = file.FileType,
                 FilePath = file.FilePath,
                 FileSize = file.FileSize,
                 UploadDate = file.UploadDate
             }).ToList();
         }
 
-        public async Task<GetFileByIdResponse> GetFileByIdAsync(int id)
+        public async Task<GetFileDTO> GetFileByIdAsync(int id)
         {
             var metadata = await _fileRepository.GetMetadataByIdAsync(id);
 
@@ -82,17 +99,17 @@ namespace FileServer_POC.Services
                 return null;
 
             var fileStream = new FileStream(metadata.FilePath, FileMode.Open, FileAccess.Read);
-            return new GetFileByIdResponse
+            return new GetFileDTO
             {
                 FileStream = fileStream,
                 FileName = metadata.FileName
             };
         }
 
-        public async Task<FileOperationResponse> DeleteFilesAndMetadataAsync(int[] ids)
+        public async Task<FileOperationDTO> DeleteFilesAndMetadataAsync(int[] ids)
         {
             var filesToDelete = await _fileRepository.GetMetadataByIdsAsync(ids);
-            var result = new FileOperationResponse
+            var result = new FileOperationDTO
             {
                 Success = true,
                 Message = "All files deleted successfully."
