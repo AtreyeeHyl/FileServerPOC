@@ -1,6 +1,7 @@
 using FileServer_POC.Entities;
 using FileServer_POC.Repositories;
 using FileServer_POC.Services;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using System;
 
@@ -10,6 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IFileRepository, FileRepository>();
+builder.Services.Configure<FormOptions>(options => {
+    options.MultipartBodyLengthLimit = 2147483648; // 2GB
+});
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite("Data Source=fileServer.db"));
