@@ -27,7 +27,7 @@ namespace FileServer_POC.Repositories
                 .ToListAsync();
         }
 
-        public async Task AddMetadataAsync(FileMetadata metadata)
+        public async Task SaveMetadataAsync(FileMetadata metadata)
         {
             _context.FileMetadata.Add(metadata);
             await _context.SaveChangesAsync();

@@ -7,9 +7,8 @@ namespace FileServer_POC.Services
 {
     public interface IFileService
     {
-        Task<object> UploadFileAsync(IFormFile file);
+        Task<FileOperationResponse> UploadFilesAsync(List<IFormFile> files);
         Task<GetFileByIdResponse> GetFileByIdAsync(int id);
-        Task<string> GenerateUniqueFileNameAsync(string originalFileName);
-        Task<DeleteFileResult> DeleteFilesAndMetadataAsync(int[] ids);
+        Task<FileOperationResponse> DeleteFilesAndMetadataAsync(int[] ids);
     }
 }

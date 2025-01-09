@@ -2,6 +2,7 @@
 using FileServer_POC.Models;
 using FileServer_POC.Repositories;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -17,48 +18,165 @@ namespace FileServer_POC.Services
             _fileRepository = fileRepository;
         }
 
-        public async Task<object> UploadFileAsync(IFormFile file)
+        public async Task<FileOperationResponse> UploadFilesAsync(List<IFormFile> files)
         {
-            if (file == null || file.Length == 0)
-                throw new ArgumentException("No file uploaded.");
+            var errors = new List<FileError>();
+            var uploadDirPath = EnsureUploadDirectoryExists();
 
+            foreach (var file in files)
+            {
+                if (file.Length == 0)
+                {
+                    errors.Add(new FileError
+                    {
+                        FileName = file.FileName,
+                        ErrorMessage = "File is empty."
+                    });
+                    continue;
+                }
+
+                try
+                {
+                    if (IsZipFile(file))
+                    {
+                        await ProcessZipFileAsync(file, uploadDirPath, errors);
+                    }
+                    else
+                    {
+                        await ProcessRegularFileAsync(file, uploadDirPath, errors);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(new FileError
+                    {
+                        FileName = file.FileName,
+                        ErrorMessage = ex.Message
+                    });
+                }
+            }
+
+            return new FileOperationResponse
+            {
+                Success = errors.Count == 0,
+                Message = errors.Count == 0 ? "All files uploaded successfully." : "Partial success in file upload.",
+                Errors = errors
+            };
+        }
+
+        private string EnsureUploadDirectoryExists()
+        {
             var uploadDirPath = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
             if (!Directory.Exists(uploadDirPath))
+            {
                 Directory.CreateDirectory(uploadDirPath);
+            }
+            return uploadDirPath;
+        }
 
-            string uniqueFileName = await GenerateUniqueFileNameAsync(file.FileName);
-            var uploadFilePath = Path.Combine(uploadDirPath, uniqueFileName);
+        private bool IsZipFile(IFormFile file)
+        {
+            return Path.GetExtension(file.FileName).Equals(".zip", StringComparison.OrdinalIgnoreCase);
+        }
 
-            using FileStream stream = new FileStream(uploadFilePath, FileMode.Create);
-            await file.CopyToAsync(stream);
+        private async Task ProcessZipFileAsync(IFormFile zipFile, string uploadDirPath, List<FileError> errors)
+        {
+            var tempZipPath = Path.Combine(uploadDirPath, zipFile.FileName);
+            using (var zipStream = new FileStream(tempZipPath, FileMode.Create))
+            {
+                await zipFile.CopyToAsync(zipStream);
+            }
 
+            var extractDirPath = GenerateUniqueFolderName(uploadDirPath, Path.GetFileNameWithoutExtension(zipFile.FileName));
+
+            try
+            {
+                System.IO.Compression.ZipFile.ExtractToDirectory(tempZipPath, extractDirPath);
+                foreach (var extractedFilePath in Directory.GetFiles(extractDirPath))
+                {
+
+                    var extractedFile = new FileInfo(extractedFilePath);
+                    var uniqueFilePath = GenerateUniqueFileName(uploadDirPath, extractedFile.Name);
+
+                    var metadata = await CreateAndSaveFileMetadataAsync(uniqueFilePath, extractedFile.FullName, extractedFile.Length);
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add(new FileError
+                {
+                    FileName = zipFile.FileName,
+                    ErrorMessage = $"Failed to extract ZIP file: {ex.Message}"
+                });
+            }
+            finally
+            {
+                System.IO.File.Delete(tempZipPath);
+            }
+        }
+
+        private async Task ProcessRegularFileAsync(IFormFile file, string uploadDirPath, List<FileError> errors)
+        {
+            try
+            {
+                var uploadFilePath = GenerateUniqueFileName(uploadDirPath, file.FileName);
+                using (var stream = new FileStream(uploadFilePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                await CreateAndSaveFileMetadataAsync(file.FileName, uploadFilePath, file.Length);
+            }
+            catch (Exception ex)
+            {
+                errors.Add(new FileError
+                {
+                    FileName = file.FileName,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
+
+        private string GenerateUniqueFolderName(string baseDir, string folderName)
+        {
+            var uniqueFolderName = folderName;
+            var counter = 1;
+
+            while (Directory.Exists(Path.Combine(baseDir, uniqueFolderName)))
+            {
+                uniqueFolderName = $"{folderName}({counter++})";
+            }
+
+            return Path.Combine(baseDir, uniqueFolderName);
+        }
+
+        private string GenerateUniqueFileName(string baseDir, string fileName)
+        {
+            var uniqueFileName = fileName;
+            var counter = 1;
+
+            while (File.Exists(Path.Combine(baseDir, uniqueFileName)))
+            {
+                var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
+                var fileExtension = Path.GetExtension(fileName);
+                uniqueFileName = $"{fileNameWithoutExtension}({counter++}){fileExtension}";
+            }
+
+            return Path.Combine(baseDir, uniqueFileName);
+        }
+
+        private async Task<FileMetadata> CreateAndSaveFileMetadataAsync(string fileName, string filePath, long fileSize)
+        {
             var metadata = new FileMetadata
             {
-                FileName = uniqueFileName,
-                FilePath = uploadFilePath,
-                FileSize = file.Length,
+                FileName = fileName,
+                FilePath = filePath,
+                FileSize = fileSize,
                 UploadDate = DateTime.UtcNow
             };
 
-            await _fileRepository.AddMetadataAsync(metadata);
-
-            return new { Message = "File uploaded successfully", metadata };
-        }
-
-        public async Task<string> GenerateUniqueFileNameAsync(string originalFileName)
-        {
-            string originalName = Path.GetFileNameWithoutExtension(originalFileName);
-            string extension = Path.GetExtension(originalFileName);
-            string uniqueFileName = originalFileName;
-            int counter = 1;
-
-            while (await _fileRepository.FileNameExistsAsync(uniqueFileName))
-            {
-                uniqueFileName = $"{originalName}({counter}){extension}";
-                counter++;
-            }
-
-            return uniqueFileName;
+            await _fileRepository.SaveMetadataAsync(metadata);
+            return metadata;
         }
 
         public async Task<GetFileByIdResponse> GetFileByIdAsync(int id)
@@ -76,10 +194,14 @@ namespace FileServer_POC.Services
             };
         }
 
-        public async Task<DeleteFileResult> DeleteFilesAndMetadataAsync(int[] ids)
+        public async Task<FileOperationResponse> DeleteFilesAndMetadataAsync(int[] ids)
         {
             var filesToDelete = await _fileRepository.GetMetadataByIdsAsync(ids);
-            var result = new DeleteFileResult();
+            var result = new FileOperationResponse
+            {
+                Success = true, 
+                Message = "All files deleted successfully." 
+            };
 
             foreach (var metadata in filesToDelete)
             {
@@ -90,10 +212,16 @@ namespace FileServer_POC.Services
                 }
             }
 
+            if (result.Errors.Count > 0)
+            {
+                result.Success = false;
+                result.Message = "Partial success in file deletion.";
+            }
+
             return result;
         }
 
-        private bool DeleteFileFromDisk(string filePath, int metadataId, DeleteFileResult result)
+        private bool DeleteFileFromDisk(string filePath, int metadataId, FileOperationResponse result)
         {
             try
             {
@@ -123,7 +251,7 @@ namespace FileServer_POC.Services
             }
         }
 
-        private async Task DeleteMetadataAsync(int metadataId, DeleteFileResult result)
+        private async Task DeleteMetadataAsync(int metadataId, FileOperationResponse result)
         {
             try
             {
