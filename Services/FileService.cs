@@ -76,5 +76,68 @@ namespace FileServer_POC.Services
             };
         }
 
+        public async Task<DeleteFileResult> DeleteFilesAndMetadataAsync(int[] ids)
+        {
+            var filesToDelete = await _fileRepository.GetMetadataByIdsAsync(ids);
+            var result = new DeleteFileResult();
+
+            foreach (var metadata in filesToDelete)
+            {
+                var fileDeleted = DeleteFileFromDisk(metadata.FilePath, metadata.Id, result);
+                if (fileDeleted)
+                {
+                    await DeleteMetadataAsync(metadata.Id, result);
+                }
+            }
+
+            return result;
+        }
+
+        private bool DeleteFileFromDisk(string filePath, int metadataId, DeleteFileResult result)
+        {
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                    return true;
+                }
+                else
+                {
+                    result.Errors.Add(new FileError
+                    {
+                        FileId = metadataId,
+                        ErrorMessage = "File not found on disk."
+                    });
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add(new FileError
+                {
+                    FileId = metadataId,
+                    ErrorMessage = $"Error deleting file: {ex.Message}"
+                });
+                return false;
+            }
+        }
+
+        private async Task DeleteMetadataAsync(int metadataId, DeleteFileResult result)
+        {
+            try
+            {
+                await _fileRepository.DeleteMetadataAsync(metadataId);
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add(new FileError
+                {
+                    FileId = metadataId,
+                    ErrorMessage = $"Error deleting metadata: {ex.Message}"
+                });
+            }
+        }
+
     }
 }

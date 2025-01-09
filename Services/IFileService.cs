@@ -10,5 +10,6 @@ namespace FileServer_POC.Services
         Task<object> UploadFileAsync(IFormFile file);
         Task<GetFileByIdResponse> GetFileByIdAsync(int id);
         Task<string> GenerateUniqueFileNameAsync(string originalFileName);
+        Task<DeleteFileResult> DeleteFilesAndMetadataAsync(int[] ids);
     }
 }
