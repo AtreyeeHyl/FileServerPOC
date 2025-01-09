@@ -36,5 +36,25 @@ namespace FileServer_POC.Controllers
             return File(result.FileStream, "application/octet-stream", result.FileName);
         }
 
+        [HttpDelete]
+        [Route("delete")]
+        public async Task<IActionResult> DeleteFiles([FromBody] int[] ids)
+        {
+            var result = await _fileService.DeleteFilesAndMetadataAsync(ids);
+
+            var successfullyDeleted = ids.Except(result.Errors.Select(e => e.FileId)).ToList();
+
+            return StatusCode(StatusCodes.Status207MultiStatus, new
+            {
+                Message = "Partial success in file deletion.",
+                SuccessfullyDeleted = successfullyDeleted,
+                FailedToDelete = result.Errors.Select(e => new
+                {
+                    FileId = e.FileId,
+                    ErrorMessage = e.ErrorMessage
+                })
+            });
+
+        }
     }
 }

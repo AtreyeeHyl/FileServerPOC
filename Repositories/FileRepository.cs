@@ -13,9 +13,18 @@ namespace FileServer_POC.Repositories
             _context = context;
         }
 
+        //returns single value
         public async Task<FileMetadata> GetMetadataByIdAsync(int id)
         {
             return await _context.FileMetadata.FindAsync(id);
+        }
+
+        //returns multiple values
+        public async Task<List<FileMetadata>> GetMetadataByIdsAsync(int[] ids)
+        {
+            return await _context.FileMetadata
+                .Where(m => ids.Contains(m.Id))
+                .ToListAsync();
         }
 
         public async Task AddMetadataAsync(FileMetadata metadata)
@@ -28,6 +37,18 @@ namespace FileServer_POC.Repositories
         {
             return await _context.FileMetadata.AnyAsync(m => m.FileName == fileName);
         }
+
+        public async Task DeleteMetadataAsync(int id)
+        {
+            var metadata = await _context.FileMetadata.FindAsync(id);
+            if (metadata != null)
+            {
+                _context.FileMetadata.Remove(metadata);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+
 
     }
 }
