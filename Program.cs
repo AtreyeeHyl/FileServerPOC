@@ -25,11 +25,30 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    dbContext.Database.Migrate();
+}
+
+//**NOTE: UNCOMMENT FOR RUNNING WITHOUT DOCKER
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+if (app.Environment.IsEnvironment("Docker"))
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "FileServer API v1");
+        c.RoutePrefix = string.Empty; 
+    });
+}
+
 
 app.UseHttpsRedirection();
 
