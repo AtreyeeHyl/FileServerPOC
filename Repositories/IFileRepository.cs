@@ -6,7 +6,8 @@ namespace FileServer_POC.Repositories
 {
     public interface IFileRepository
     {
-        Task<List<FileMetadata>> GetAllMetadataAsync();
+        Task<List<FileMetadata>> GetAllMetadataAsync(string? filterOn = null, string? filterQuery = null);
+        Task<List<FileMetadata>> GetAllMetadataByDateAsync(DateTime? startDate = null, DateTime? endDate = null);
 
         Task<FileMetadata> GetMetadataByIdAsync(int id);
 
@@ -15,5 +16,6 @@ namespace FileServer_POC.Repositories
         Task SaveMetadataAsync(FileMetadata metadata);
 
         Task DeleteMetadataAsync(int id);
+        Task UpdateMetadataAsync(FileMetadata metadata);
     }
 }

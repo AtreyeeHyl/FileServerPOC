@@ -1,5 +1,7 @@
 ﻿using FileServer_POC.DTOs;
 using FileServer_POC.Helpers;
+using FileServer_POC.Models;
+using Microsoft.VisualBasic.FileIO;
 
 namespace FileServer_POC.Services.Utilities
 {
@@ -25,6 +27,33 @@ namespace FileServer_POC.Services.Utilities
                     await file.CopyToAsync(stream);
                 }
                 await metadataHelper.CreateAndSaveFileMetadataAsync(file.FileName, uploadFilePath, file.Length);
+            }
+            catch (Exception ex)
+            {
+                errors.Add(new FileErrorDTO
+                {
+                    FileName = file.FileName,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
+
+        public async Task UpdateRegularFileAsync(IFormFile file, string uploadDirPath, List<FileErrorDTO> errors, FileMetadataHelper metadataHelper, FileMetadata metadata)
+        {
+            try
+            {
+                var uploadFilePath = GenerateUniqueFileName(uploadDirPath, file.FileName);
+                using (var stream = new FileStream(uploadFilePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+                metadata.FileName = file.FileName;
+                metadata.FileType = Path.GetExtension(file.FileName);
+                metadata.FilePath = uploadFilePath;
+                metadata.FileSize = file.Length;
+                metadata.UploadDate = DateTime.UtcNow;
+
+                await metadataHelper.UpdateFileMetadataAsync(metadata);
             }
             catch (Exception ex)
             {

@@ -27,6 +27,13 @@ namespace FileServer_POC.Helpers
             await _fileRepository.SaveMetadataAsync(metadata);
         }
 
+        public async Task UpdateFileMetadataAsync(FileMetadata metadata)
+        {
+
+            await _fileRepository.UpdateMetadataAsync(metadata);
+
+        }
+
         public async Task DeleteMetadataAsync(int metadataId, FileOperationDTO result)
         {
             try

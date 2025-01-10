@@ -3,6 +3,10 @@ using FileServer_POC.Repositories;
 using FileServer_POC.Services.Utilities;
 using FileServer_POC.Helpers;
 using Microsoft.AspNetCore.Mvc;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.IO;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
 
 namespace FileServer_POC.Services
 {
@@ -61,27 +65,32 @@ namespace FileServer_POC.Services
             };
         }
 
-        public async Task<List<GetFileDTO>> GetAllFilesAsync([FromQuery] string? filterOn = null, [FromQuery] string? filterQuery = null)
-        {
-            var files = await _fileRepository.GetAllMetadataAsync();
+ 
 
-            // Apply filtering if parameters are provided
-            if (!string.IsNullOrEmpty(filterOn) && !string.IsNullOrEmpty(filterQuery))
-            {
-                files = filterOn.ToLower() switch
-                {
-                    "filename" => files.Where(file => file.FileName != null && file.FileName.Contains(filterQuery, StringComparison.OrdinalIgnoreCase)).ToList(),
-                    "filesize" => int.TryParse(filterQuery, out var maxSize)
-                    ? files.Where(file => file.FileSize <= maxSize).ToList()
-                    : files, // If parsing fails, return original list
-                    "filetype" => files.Where(file => file.FileType != null && file.FileType.Contains(filterQuery, StringComparison.OrdinalIgnoreCase)).ToList(),
-                    _ => files // If the filterOn value is not recognized, return the original list
-                };
-            }
+        public async Task<List<GetFileDTO>> GetAllFilesAsync(string? filterOn = null, string? filterQuery = null)
+        {
+            var files = await _fileRepository.GetAllMetadataAsync(filterOn, filterQuery);
 
             //Convert to DTO
             return files.Select(file => new GetFileDTO
             {
+                FileId = file.Id,
+                FileName = file.FileName,
+                FileType = file.FileType,
+                FilePath = file.FilePath,
+                FileSize = file.FileSize,
+                UploadDate = file.UploadDate
+            }).ToList();
+        }
+
+        public async Task<List<GetFileDTO>> GetAllFilesStreamAsync(string? filterOn = null, string? filterQuery = null)
+        {
+            var files = await _fileRepository.GetAllMetadataAsync(filterOn, filterQuery);
+
+            //Convert to DTO
+            return files.Select(file => new GetFileDTO
+            {
+                FileStream = new FileStream(file.FilePath, FileMode.Open, FileAccess.Read),
                 FileId = file.Id,
                 FileName = file.FileName,
                 FileType = file.FileType,
@@ -104,6 +113,52 @@ namespace FileServer_POC.Services
                 FileStream = fileStream,
                 FileName = metadata.FileName
             };
+        }
+
+        public async Task<FileOperationDTO> UpdateFileByIdAsync(int id, IFormFile file)
+        {
+            var metadata = await _fileRepository.GetMetadataByIdAsync(id);
+
+            if (metadata == null)
+            {
+                return new FileOperationDTO
+                {
+                    Success = false,
+                    Message = $"File with ID {id} not found!",
+
+                };
+            }
+
+            try
+            {
+                
+                await DeleteFilesAsync([id]);
+
+                var uploadDirPath = _fileStorageHelper.EnsureUploadDirectoryExists();
+                var errors = new List<FileErrorDTO>();
+
+                await _fileStorageHelper.UpdateRegularFileAsync(file, uploadDirPath, errors, _fileMetadataHelper, metadata);
+              
+                return new FileOperationDTO
+                {
+                    Success = true,
+                    Message = $"File with ID {id} is updated successfully!",
+
+                };
+
+            }
+            catch (Exception ex)
+            {
+                return new FileOperationDTO
+                {
+                    Success = false,
+                    Message = $"File with ID {id} not found!",
+
+                };
+            }
+
+
+
         }
 
         public async Task<FileOperationDTO> DeleteFilesAndMetadataAsync(int[] ids)
@@ -133,5 +188,89 @@ namespace FileServer_POC.Services
             return result;
         }
 
+        public async Task<FileOperationDTO> DeleteFilesAsync(int[] ids)
+        {
+            var filesToDelete = await _fileRepository.GetMetadataByIdsAsync(ids);
+            var result = new FileOperationDTO
+            {
+                Success = true,
+                Message = "All files deleted successfully."
+            };
+
+            foreach (var metadata in filesToDelete)
+            {
+                var fileDeleted = _fileStorageHelper.DeleteFile(metadata.FilePath, metadata.Id, result);
+            }
+
+            if (result.Errors.Count > 0)
+            {
+                result.Success = false;
+                result.Message = "Partial success in file deletion.";
+            }
+
+            return result;
+        }
+
+        public async Task<FileOperationDTO> UpdateFileNameAndMetadataAsync(int id, string newFileName)
+        {
+            var metadata = await _fileRepository.GetMetadataByIdAsync(id);
+
+            if (metadata == null || !_fileStorageHelper.FileExists(metadata.FilePath))
+            {
+                return new FileOperationDTO
+                {
+                    Success = false,
+                    Message = $"File with ID {id} not found!",
+                };
+            }
+
+            try
+            {
+                // Rename the file in the storage
+                var directory = Path.GetDirectoryName(metadata.FilePath);
+                var newFilePath = Path.Combine(directory, newFileName);
+
+                // Rename the file in the storage system
+                File.Move(metadata.FilePath, newFilePath);
+
+                // Update the metadata
+                metadata.FileName = newFileName;
+                metadata.FilePath = newFilePath;
+
+                await _fileRepository.UpdateMetadataAsync(metadata);
+
+                return new FileOperationDTO
+                {
+                    Success = true,
+                    Message = $"File name and metadata updated successfully for ID {id}.",
+                };
+            }
+            catch (Exception ex)
+            {
+                return new FileOperationDTO
+                {
+                    Success = false,
+                    Message = $"Error updating file: {ex.Message}",
+                };
+            }
+        }
+
+        public async Task<List<GetFileDTO>> GetAllFilesByDateRangeAsync(DateTime? startDate = null, DateTime? endDate = null)
+        {
+            // Fetch files from the repository by date range
+            var filesMetadata = await _fileRepository.GetAllMetadataByDateAsync(startDate, endDate);
+
+            // Convert the list of FileMetadata to GetFileDTO
+            var filesDTO = filesMetadata.Select(file => new GetFileDTO
+            {
+                FileId = file.Id,
+                FileName = file.FileName,
+                FileSize = file.FileSize,
+                FileType = file.FileType,
+                UploadDate = file.UploadDate
+            }).ToList();
+
+            return filesDTO;
+        }
     }
 }
