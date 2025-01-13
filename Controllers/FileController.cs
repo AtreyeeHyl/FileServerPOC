@@ -20,7 +20,7 @@ namespace FileServer_POC.Controllers
 
         //Upload Files Single or Multiple
         [HttpPost]
-        [Route("")]
+        [Route("UploadFiles")]
         public async Task<ActionResult> UploadFiles([FromForm] List<IFormFile> files)
         {
             if (files == null || files.Count == 0)
@@ -42,7 +42,7 @@ namespace FileServer_POC.Controllers
 
 
         //Update File
-        [HttpPut("{id}/UpdateFile")]
+        [HttpPut("UpdateFile/{id}")]
         public async Task<ActionResult> UpdateFiles(int id,[FromForm] List<IFormFile> files)
         {
             if (files == null || files.Count == 0)
@@ -64,7 +64,7 @@ namespace FileServer_POC.Controllers
 
 
         // Update File Name and Metadata
-        [HttpPut("{id}/RenameFile")]
+        [HttpPut("RenameFile/{id}")]
         public async Task<ActionResult> UpdateFileNameAndMetadata(int id, [FromForm] string newFileName)
         {
             if (string.IsNullOrEmpty(newFileName))
@@ -88,7 +88,7 @@ namespace FileServer_POC.Controllers
 
         //Get Multiple Files Details Using Filters
         [HttpGet]
-        [Route("AllFilesDetails")]
+        [Route("GetFilesDetails")]
         public async Task<IActionResult> GetAllFilesDetails([FromQuery] string? filterOn, [FromQuery] string? filterQuery)
         {
             var files = await _fileService.GetAllFilesAsync(filterOn,filterQuery);
@@ -117,7 +117,7 @@ namespace FileServer_POC.Controllers
 
 
         //Download Single file using ID
-        [HttpGet("{id}")]
+        [HttpGet("GetFileByID/{id}")]
         public async Task<IActionResult> GetFileById(int id)
         {
             var result = await _fileService.GetFileByIdAsync(id);
@@ -131,7 +131,7 @@ namespace FileServer_POC.Controllers
 
         //Download Multiple Files Using Filters
         [HttpGet]
-        [Route("AllFilesDownload")]
+        [Route("GetFilesDownload")]
         public async Task<IActionResult> GetAllFiles([FromQuery] string? filterOn, [FromQuery] string? filterQuery)
         {
             var files = await _fileService.GetAllFilesStreamAsync(filterOn, filterQuery);
@@ -178,7 +178,7 @@ namespace FileServer_POC.Controllers
 
         //Delete Single or Multiple files using ID
         [HttpDelete]
-        [Route("")]
+        [Route("DeleteFiles")]
         public async Task<IActionResult> DeleteFiles([FromBody] int[] ids)
         {
             var result = await _fileService.DeleteFilesAndMetadataAsync(ids);
