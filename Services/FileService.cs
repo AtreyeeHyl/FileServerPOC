@@ -7,6 +7,7 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.IO;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace FileServer_POC.Services
 {
@@ -17,14 +18,17 @@ namespace FileServer_POC.Services
         private readonly FileMetadataHelper _fileMetadataHelper;
         private readonly FileValidationHelper _fileValidationHelper;
         private readonly ZipProcessingHelper _zipProcessingHelper;
+        private readonly IMemoryCache _memoryCache;
+        private readonly string _cacheKey = "SampleData";
 
-        public FileService(IFileRepository fileRepository)
+        public FileService(IFileRepository fileRepository, IMemoryCache memoryCache)
         {
             _fileRepository = fileRepository;
             _fileStorageHelper = new FileStorageHelper();
             _fileMetadataHelper = new FileMetadataHelper(_fileRepository);
             _fileValidationHelper = new FileValidationHelper();
             _zipProcessingHelper = new ZipProcessingHelper(_fileStorageHelper, _fileMetadataHelper);
+            _memoryCache = memoryCache;
         }
 
         public async Task<FileOperationDTO> UploadFilesAsync(List<IFormFile> files)
@@ -69,18 +73,35 @@ namespace FileServer_POC.Services
 
         public async Task<List<GetFileDTO>> GetAllFilesAsync(string? filterOn = null, string? filterQuery = null)
         {
-            var files = await _fileRepository.GetAllMetadataAsync(filterOn, filterQuery);
+            
+            // Create a unique cache key based on filters
+            string cacheKey = $"AllFiles_{filterOn ?? "None"}_{filterQuery ?? "None"}";
 
-            //Convert to DTO
-            return files.Select(file => new GetFileDTO
+            // Check if the data is already cached
+            if (!_memoryCache.TryGetValue(cacheKey, out List<GetFileDTO> cachedFiles))
             {
-                FileId = file.Id,
-                FileName = file.FileName,
-                FileType = file.FileType,
-                FilePath = file.FilePath,
-                FileSize = file.FileSize,
-                UploadDate = file.UploadDate
-            }).ToList();
+                var files = await _fileRepository.GetAllMetadataAsync(filterOn, filterQuery);
+
+                // Convert to DTO
+                cachedFiles = files.Select(file => new GetFileDTO
+                {
+                    FileId = file.Id,
+                    FileName = file.FileName,
+                    FileType = file.FileType,
+                    FilePath = file.FilePath,
+                    FileSize = file.FileSize,
+                    UploadDate = file.UploadDate
+                }).ToList();
+
+                // Cache the result with appropriate expiration settings
+                var cacheEntryOptions = new MemoryCacheEntryOptions()
+                    .SetSlidingExpiration(TimeSpan.FromSeconds(20)) // Extend expiration if accessed
+                    .SetAbsoluteExpiration(TimeSpan.FromSeconds(40)); // Max cache lifespan
+
+                _memoryCache.Set(cacheKey, cachedFiles, cacheEntryOptions);
+            }
+
+            return cachedFiles;
         }
 
         public async Task<List<GetFileDTO>> GetAllFilesStreamAsync(string? filterOn = null, string? filterQuery = null)
@@ -257,7 +278,14 @@ namespace FileServer_POC.Services
 
         public async Task<List<GetFileDTO>> GetAllFilesByDateRangeAsync(DateTime? startDate = null, DateTime? endDate = null)
         {
-            // Fetch files from the repository by date range
+            // Define a unique cache key based on the date range
+            var cacheKey = $"FilesByDateRange_{startDate?.ToString("yyyyMMdd") ?? "Start"}_{endDate?.ToString("yyyyMMdd") ?? "End"}";
+
+            if (_memoryCache.TryGetValue(cacheKey, out List<GetFileDTO> cachedFiles))
+            {
+                return cachedFiles;
+            }
+
             var filesMetadata = await _fileRepository.GetAllMetadataByDateAsync(startDate, endDate);
 
             // Convert the list of FileMetadata to GetFileDTO
@@ -269,6 +297,13 @@ namespace FileServer_POC.Services
                 FileType = file.FileType,
                 UploadDate = file.UploadDate
             }).ToList();
+
+            // Store the result in the cache with a sliding expiration of 30 seconds
+            _memoryCache.Set(cacheKey, filesDTO, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30),
+                SlidingExpiration = TimeSpan.FromSeconds(15)
+            });
 
             return filesDTO;
         }
