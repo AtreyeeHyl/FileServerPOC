@@ -81,10 +81,10 @@ namespace FileServer_POC.Repositories
             }
 
             // Check if the table is empty and reset the identity seed
-            if (!await _context.FileMetadata.AnyAsync())
-            {
-                await _context.Database.ExecuteSqlRawAsync("DELETE FROM sqlite_sequence WHERE name = 'FileMetadata';");
-            }
+            //if (!await _context.FileMetadata.AnyAsync())
+            //{
+            //    await _context.Database.ExecuteSqlRawAsync("DELETE FROM sqlite_sequence WHERE name = 'FileMetadata';");
+            //}
 
         }
 
