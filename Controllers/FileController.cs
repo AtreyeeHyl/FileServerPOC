@@ -7,6 +7,8 @@ using System.IO.Compression;
 using System.Text.Json;
 using FileServer_POC.DTOs;
 using Amazon.S3.Model;
+using Azure;
+using System.IO;
 
 
 namespace FileServer_POC.Controllers
@@ -25,25 +27,6 @@ namespace FileServer_POC.Controllers
         }
 
 
-
-        [HttpPost]
-        [Route("CreateS3Bucket")]
-        public async Task<IActionResult> CreateBucketAsync(string bucketName)
-        {
-            var bucketExists = await Amazon.S3.Util.AmazonS3Util.DoesS3BucketExistV2Async(_s3Client, bucketName);
-            if (bucketExists) return BadRequest($"Bucket {bucketName} already exists.");
-            await _s3Client.PutBucketAsync(bucketName);
-            return Created("buckets", $"Bucket {bucketName} created.");
-        }
-
-        [HttpGet]
-        [Route("GetAllS3Buckets")]
-        public async Task<IActionResult> GetAllBucketAsync()
-        {
-            var data = await _s3Client.ListBucketsAsync();
-            var buckets = data.Buckets.Select(b => { return b.BucketName; });
-            return Ok(buckets);
-        }
 
 
 
@@ -203,55 +186,56 @@ namespace FileServer_POC.Controllers
             if (result == null)
                 return NotFound(new { Message = "File not found." });
 
-            return File(result.FileStream, "application/octet-stream", result.FileName);
+            return File(result.MemoryStream, "application/octet-stream", result.FileName);
+
         }
 
 
         //Download Multiple Files Using Filters
-        [HttpGet]
-        [Route("GetFilesDownload")]
-        public async Task<IActionResult> GetAllFiles([FromQuery] string? filterOn, [FromQuery] string? filterQuery)
-        {
-            var files = await _fileService.GetAllFilesStreamAsync(filterOn, filterQuery);
+        //[HttpGet]
+        //[Route("GetFilesDownload")]
+        //public async Task<IActionResult> GetAllFiles([FromQuery] string? filterOn, [FromQuery] string? filterQuery)
+        //{
+        //    var files = await _fileService.GetAllFilesStreamAsync(filterOn, filterQuery);
 
-            if (files == null || files.Count == 0)
-                return NotFound("No files found.");
+        //    if (files == null || files.Count == 0)
+        //        return NotFound("No files found.");
 
-            // Create a memory stream to hold the zip file
-            var memoryStream = new MemoryStream();
+        //    // Create a memory stream to hold the zip file
+        //    var memoryStream = new MemoryStream();
 
-            // Create the zip archive
-            using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
-            {
-                foreach (var file in files)
-                {
-                    var zipEntry = archive.CreateEntry(file.FileName);
-                    using (var zipStream = zipEntry.Open())
-                    {
-                        // Copy the file's stream into the zip entry stream
-                        await file.FileStream.CopyToAsync(zipStream);
-                    }
-                }
-            }
+        //    // Create the zip archive
+        //    using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
+        //    {
+        //        foreach (var file in files)
+        //        {
+        //            var zipEntry = archive.CreateEntry(file.FileName);
+        //            using (var zipStream = zipEntry.Open())
+        //            {
+        //                // Copy the file's stream into the zip entry stream
+        //                await file.FileStream.CopyToAsync(zipStream);
+        //            }
+        //        }
+        //    }
 
-            // Reset memory stream position before sending
-            memoryStream.Position = 0;
+        //    // Reset memory stream position before sending
+        //    memoryStream.Position = 0;
 
-            // Prepare file metadata
-            var fileMetadata = files.Select(file => new
-            {
-                file.FileName
-            }).ToList();
+        //    // Prepare file metadata
+        //    var fileMetadata = files.Select(file => new
+        //    {
+        //        file.FileName
+        //    }).ToList();
 
-            // Serialize the metadata to JSON
-            var metadataJson = JsonConvert.SerializeObject(fileMetadata);
+        //    // Serialize the metadata to JSON
+        //    var metadataJson = JsonConvert.SerializeObject(fileMetadata);
 
-            // Add metadata to custom header
-            HttpContext.Response.Headers.Append("X-File-Metadata", metadataJson);
+        //    // Add metadata to custom header
+        //    HttpContext.Response.Headers.Append("X-File-Metadata", metadataJson);
 
-            // Return the zip file as a downloadable file
-            return File(memoryStream, "application/zip", "AllFiles.zip");
-        }
+        //    // Return the zip file as a downloadable file
+        //    return File(memoryStream, "application/zip", "AllFiles.zip");
+        //}
 
 
         //Delete Single or Multiple files using ID

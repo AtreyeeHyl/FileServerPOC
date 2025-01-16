@@ -12,7 +12,9 @@ namespace FileServer_POC.DTOs
         public DateTime UploadDate { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public FileStream FileStream { get; set; }
+        public MemoryStream MemoryStream { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string PreSignedUrl { get; set; }
 
     }
 }
