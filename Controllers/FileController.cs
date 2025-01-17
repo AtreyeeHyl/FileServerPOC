@@ -9,6 +9,7 @@ using FileServer_POC.DTOs;
 using Amazon.S3.Model;
 using Azure;
 using System.IO;
+using FileServer_POC.Models;
 
 
 namespace FileServer_POC.Controllers
@@ -36,7 +37,7 @@ namespace FileServer_POC.Controllers
             if (files == null || files.Count == 0)
                 return BadRequest("No files uploaded.");
 
-            var result = await _fileService.UploadFilesAsync(files);
+            var result = await _fileService.UploadFilesAsync(files,string.Empty);
 
             if (!result.Success)
             {
@@ -50,8 +51,56 @@ namespace FileServer_POC.Controllers
             return Ok(new { Message = "All files uploaded successfully." });
         }
 
+        // Bulk upload
+        [HttpPost]
+        [Route("UploadFilesBulk")]
+        public IActionResult UploadFilesBulk([FromForm] List<IFormFile> files)
+        {
+            if (files == null || files.Count == 0)
+                return BadRequest("No files uploaded.");
 
-        
+            // Buffer files in memory before starting the background task
+            var bufferedFiles = files.Select(file => new BufferedFile
+            {
+                FileName = file.FileName,
+                ContentType = file.ContentType,
+                Content = _fileService.CopyToMemoryStream(file)
+            }).ToList();
+
+            // Trigger background upload
+            _ = Task.Run(async () =>
+            {
+                await _fileService.UploadBufferedFilesAsync(bufferedFiles, "Bulk/");
+            });
+
+            // Return immediate response to the client
+            return Ok(new { Message = "File upload initiated. You will receive a notification when the process is complete." });
+        }
+
+        ////Bulk upload
+        //[HttpPost]
+        //[Route("UploadFilesBulk")]
+        //public async Task<IActionResult> UploadFilesBulk([FromForm] List<IFormFile> files)
+        //{
+        //    if (files == null || files.Count == 0)
+        //        return BadRequest("No files uploaded.");
+
+        //    var result = await _fileService.UploadFilesAsync(files, "Bulk/");
+
+        //    if (!result.Success)
+        //    {
+        //        return StatusCode(StatusCodes.Status207MultiStatus, new
+        //        {
+        //            Message = "Partial success in file upload.",
+        //            Errors = result.Errors
+        //        });
+        //    }
+
+        //    return Ok(new { Message = "All files uploaded successfully." });
+        //}
+
+
+
 
         //Get Multiple Files Details Using Filters
         [HttpGet]

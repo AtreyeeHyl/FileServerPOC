@@ -14,6 +14,7 @@ using Amazon.S3.Model;
 using Azure.Core;
 using Amazon.Runtime.Internal;
 using System.Reflection.Metadata;
+using FileServer_POC.Models;
 
 namespace FileServer_POC.Services
 {
@@ -43,10 +44,9 @@ namespace FileServer_POC.Services
             _bucketName = configuration["AWS:BucketName"];
         }
 
-        public async Task<FileOperationDTO> UploadFilesAsync(List<IFormFile> files)
+        public async Task<FileOperationDTO> UploadFilesAsync(List<IFormFile> files, string? bucket_prefix)
         {
             var errors = new List<FileErrorDTO>();
-            //var uploadDirPath = _fileStorageHelper.EnsureUploadDirectoryExists();
 
             foreach (var file in files)
             {
@@ -56,12 +56,11 @@ namespace FileServer_POC.Services
                 {
                     if (_fileValidationHelper.IsZipFile(file))
                     {
-                        await _zipProcessingHelper.ProcessZipFileAsync(file, errors);
+                        await _zipProcessingHelper.ProcessZipFileAsync(file, errors,bucket_prefix);
                     }
                     else
                     {
-                        //await _fileStorageHelper.SaveRegularFileAsync(file, uploadDirPath, errors, _fileMetadataHelper);
-                        await _fileStorageHelper.SaveFileToS3Async(file, errors, _fileMetadataHelper);
+                        await _fileStorageHelper.SaveFileToS3Async(file, errors, _fileMetadataHelper, bucket_prefix);
                     }
                 }
                 catch (Exception ex)
@@ -81,6 +80,63 @@ namespace FileServer_POC.Services
                 Errors = errors
             };
         }
+
+
+        public async Task<FileOperationDTO> UploadBufferedFilesAsync(List<BufferedFile> bufferedFiles, string bucket_prefix)
+        {
+            var result = new FileOperationDTO { Success = true, Errors = new List<FileErrorDTO>() };
+
+            foreach (var bufferedFile in bufferedFiles)
+            {
+                try
+                {
+                    // Generate a unique key for the file in S3
+                    var uniqueKey = $"{bucket_prefix}{Guid.NewGuid()}_{bufferedFile.FileName}";
+
+                    // Upload the file to S3
+                    var uploadRequest = new Amazon.S3.Model.PutObjectRequest
+                    {
+                        BucketName = _bucketName,
+                        Key = uniqueKey,
+                        InputStream = bufferedFile.Content,
+                        ContentType = bufferedFile.ContentType
+                    };
+
+                    await _s3Client.PutObjectAsync(uploadRequest);
+
+                    // Optionally save metadata for the uploaded file
+                    await _fileMetadataHelper.CreateAndSaveFileMetadataAsync(bufferedFile.FileName, uniqueKey, bufferedFile.Content.Length);
+                }
+                catch (Exception ex)
+                {
+                    // Capture errors for each file
+                    result.Success = false;
+                    result.Errors.Add(new FileErrorDTO
+                    {
+                        FileName = bufferedFile.FileName,
+                        ErrorMessage = ex.Message
+                    });
+                }
+                finally
+                {
+                    // Dispose the memory stream to free resources
+                    bufferedFile.Content.Dispose();
+                }
+            }
+
+            return result;
+        }
+
+
+
+
+
+
+
+
+
+
+
 
 
         public async Task<List<GetFileDTO>> GetAllFilesAsync(string? filterOn = null, string? filterQuery = null)
@@ -443,8 +499,14 @@ namespace FileServer_POC.Services
             return result;
         }
 
-        
+        public MemoryStream CopyToMemoryStream(IFormFile file)
+        {
+            var memoryStream = new MemoryStream();
+            file.CopyTo(memoryStream);
+            memoryStream.Position = 0; // Reset stream position
+            return memoryStream;
+        }
 
-        
+
     }
 }

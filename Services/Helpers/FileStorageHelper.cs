@@ -19,45 +19,7 @@ namespace FileServer_POC.Services.Utilities
             _bucketName = configuration["AWS:BucketName"]; // Read from appsettings.json
         }
 
-
-        //public string EnsureUploadDirectoryExists()
-        //{
-        //    var uploadDirPath = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
-        //    if (!Directory.Exists(uploadDirPath))
-        //    {
-        //        Directory.CreateDirectory(uploadDirPath);
-        //    }
-        //    return uploadDirPath;
-        //}
-
-        //public async Task<bool> IfS3BucketExists(string bucketName)
-        //{
-        //    var bucketExists = await Amazon.S3.Util.AmazonS3Util.DoesS3BucketExistV2Async(_s3Client, bucketName);
-        //    return bucketExists;
-        //}
-
-        //public async Task SaveRegularFileAsync(IFormFile file, string uploadDirPath, List<FileErrorDTO> errors, FileMetadataHelper metadataHelper)
-        //{
-        //    try
-        //    {
-        //        var uploadFilePath = GenerateUniqueFileName(uploadDirPath, file.FileName);
-        //        using (var stream = new FileStream(uploadFilePath, FileMode.Create))
-        //        {
-        //            await file.CopyToAsync(stream);
-        //        }
-        //        await metadataHelper.CreateAndSaveFileMetadataAsync(file.FileName, uploadFilePath, file.Length);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        errors.Add(new FileErrorDTO
-        //        {
-        //            FileName = file.FileName,
-        //            ErrorMessage = ex.Message
-        //        });
-        //    }
-        //}
-
-        public async Task SaveFileToS3Async(IFormFile file, List<FileErrorDTO> errors, FileMetadataHelper metadataHelper)
+        public async Task SaveFileToS3Async(IFormFile file, List<FileErrorDTO> errors, FileMetadataHelper metadataHelper, string? bucket_prefix)
         {
             try
             {
@@ -69,9 +31,9 @@ namespace FileServer_POC.Services.Utilities
                 }
 
                 // Generate a unique key for the file in S3
-                var uniqueKey = $"{Guid.NewGuid()}_{file.FileName}";
+                var uniqueKey = $"{bucket_prefix}{Guid.NewGuid()}_{file.FileName}";
 
-                // Upload the file to S3
+                //Upload the file to S3
                 using (var stream = file.OpenReadStream())
                 {
                     var uploadRequest = new Amazon.S3.Model.PutObjectRequest
@@ -84,6 +46,9 @@ namespace FileServer_POC.Services.Utilities
 
                     var response = await _s3Client.PutObjectAsync(uploadRequest);
                 }
+
+
+
 
                 // Optionally save metadata for the uploaded file
                 await metadataHelper.CreateAndSaveFileMetadataAsync(file.FileName, uniqueKey, file.Length);
@@ -100,32 +65,7 @@ namespace FileServer_POC.Services.Utilities
 
 
 
-        //public async Task UpdateRegularFileAsync(IFormFile file, List<FileErrorDTO> errors, FileMetadataHelper metadataHelper, FileMetadata metadata)
-        //{
-        //    try
-        //    {
-        //        //var uploadFilePath = GenerateUniqueFileName(uploadDirPath, file.FileName);
-        //        using (var stream = new FileStream(uploadFilePath, FileMode.Create))
-        //        {
-        //            await file.CopyToAsync(stream);
-        //        }
-        //        metadata.FileName = file.FileName;
-        //        metadata.FileType = Path.GetExtension(file.FileName);
-        //        metadata.FilePath = uploadFilePath;
-        //        metadata.FileSize = file.Length;
-        //        metadata.UploadDate = DateTime.UtcNow;
 
-        //        await metadataHelper.UpdateFileMetadataAsync(metadata);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        errors.Add(new FileErrorDTO
-        //        {
-        //            FileName = file.FileName,
-        //            ErrorMessage = ex.Message
-        //        });
-        //    }
-        //}
 
         public async Task UpdateRegularFileAsync(IFormFile file, List<FileErrorDTO> errors, FileMetadataHelper metadataHelper, FileMetadata metadata)
         {
@@ -277,5 +217,8 @@ namespace FileServer_POC.Services.Utilities
                 return false;
             }
         }
+
+        
+
     }
 }

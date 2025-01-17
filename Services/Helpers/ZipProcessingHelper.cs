@@ -49,7 +49,7 @@ namespace FileServer_POC.Services.Utilities
         //}
 
 
-        public async Task ProcessZipFileAsync(IFormFile zipFile, List<FileErrorDTO> errors)
+        public async Task ProcessZipFileAsync(IFormFile zipFile, List<FileErrorDTO> errors, string? bucket_prefix)
         {
             var tempZipPath = zipFile.FileName;
 
@@ -72,7 +72,7 @@ namespace FileServer_POC.Services.Utilities
 
                     IFormFile extractedFileForm = ConvertToIFormFile(extractedFile);
 
-                    await _fileStorageHelper.SaveFileToS3Async(extractedFileForm, errors, _fileMetadataHelper);
+                    await _fileStorageHelper.SaveFileToS3Async(extractedFileForm, errors, _fileMetadataHelper, bucket_prefix);
 
                 }
             }
