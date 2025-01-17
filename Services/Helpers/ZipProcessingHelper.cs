@@ -60,22 +60,18 @@ namespace FileServer_POC.Services.Utilities
             }
 
             // Generate a unique folder name for the extracted files
-            var extractDirPath = tempZipPath + "ExtendedPath";
+            var extractDirPath = tempZipPath + "ExtractedFolder";
 
             try
             {
-                // Extract the zip file to the specified directory
                 System.IO.Compression.ZipFile.ExtractToDirectory(tempZipPath, extractDirPath);
 
-                // Loop through all the extracted files and upload each one to S3
                 foreach (var extractedFilePath in Directory.GetFiles(extractDirPath))
                 {
                     var extractedFile = new FileInfo(extractedFilePath);
 
-                    // Convert the extracted file to IFormFile
                     IFormFile extractedFileForm = ConvertToIFormFile(extractedFile);
 
-                    // Call SaveFileToS3Async to upload the extracted file to S3
                     await _fileStorageHelper.SaveFileToS3Async(extractedFileForm, errors, _fileMetadataHelper);
 
                 }
@@ -91,9 +87,12 @@ namespace FileServer_POC.Services.Utilities
             }
             finally
             {
-                // Clean up the temporary zip file after processing
+                // Clean up the temporary zip files after processing
                 File.Delete(tempZipPath);
-                File.Delete(extractDirPath);
+                if (Directory.Exists(extractDirPath))
+                {
+                    Directory.Delete(extractDirPath, true);
+                }
             }
         }
 
@@ -114,7 +113,7 @@ namespace FileServer_POC.Services.Utilities
             var formFile = new FormFile(memoryStream, 0, memoryStream.Length, fileInfo.Name, fileInfo.Name)
             {
                 Headers = new HeaderDictionary(),
-                ContentType = "application/octet-stream" // You can set this to a more specific content type
+                ContentType = "application/octet-stream"
             };
 
             return formFile;

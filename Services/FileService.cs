@@ -13,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Amazon.S3.Model;
 using Azure.Core;
 using Amazon.Runtime.Internal;
+using System.Reflection.Metadata;
 
 namespace FileServer_POC.Services
 {
@@ -82,45 +83,6 @@ namespace FileServer_POC.Services
         }
 
 
-
-        //public async Task<List<GetFileDTO>> GetAllFilesAsync(string? filterOn = null, string? filterQuery = null)
-        //{
-
-        //    // Create a unique cache key based on filters
-        //    string cacheKey = $"AllFiles_{filterOn ?? "None"}_{filterQuery ?? "None"}";
-
-        //    // Check if the data is already cached
-        //    if (!_memoryCache.TryGetValue(cacheKey, out List<GetFileDTO> cachedFiles))
-        //    {
-        //        var files = await _fileRepository.GetAllMetadataAsync(filterOn, filterQuery);
-
-
-        //        // Convert to DTO
-        //        cachedFiles = files.Select(file => new GetFileDTO
-        //        {
-
-
-
-
-        //            FileId = file.Id,
-        //            FileName = file.FileName,
-        //            FileType = file.FileType,
-        //            FilePath = file.FilePath,
-        //            FileSize = file.FileSize,
-        //            UploadDate = file.UploadDate
-        //        }).ToList();
-
-        //        // Cache the result with appropriate expiration settings
-        //        var cacheEntryOptions = new MemoryCacheEntryOptions()
-        //            .SetSlidingExpiration(TimeSpan.FromSeconds(20)) // Extend expiration if accessed
-        //            .SetAbsoluteExpiration(TimeSpan.FromSeconds(40)); // Max cache lifespan
-
-        //        _memoryCache.Set(cacheKey, cachedFiles, cacheEntryOptions);
-        //    }
-
-        //    return cachedFiles;
-        //}
-
         public async Task<List<GetFileDTO>> GetAllFilesAsync(string? filterOn = null, string? filterQuery = null)
         {
             // Create a unique cache key based on filters
@@ -175,70 +137,73 @@ namespace FileServer_POC.Services
             return cachedFiles;
         }
 
-        public async Task<List<GetFileDTO>> GetAllFilesStreamAsync(string? filterOn = null, string? filterQuery = null)
+        public async Task<List<GetFileDTO>> GetAllFilesByDateRangeAsync(DateTime? startDate = null, DateTime? endDate = null)
         {
-            var files = await _fileRepository.GetAllMetadataAsync(filterOn, filterQuery);
+            // Define a unique cache key based on the date range
+            var cacheKey = $"FilesByDateRange_{startDate?.ToString("yyyyMMdd") ?? "Start"}_{endDate?.ToString("yyyyMMdd") ?? "End"}";
 
-            if (files == null)
-                return null;
-
-            //Convert to DTO
-            return files.Select(file => new GetFileDTO
+            if (_memoryCache.TryGetValue(cacheKey, out List<GetFileDTO> cachedFiles))
             {
-                //FileStream = new FileStream(file.FilePath, FileMode.Open, FileAccess.Read),
-                FileId = file.Id,
-                FileName = file.FileName,
-                FileType = file.FileType,
-                FilePath = file.FilePath,
-                FileSize = file.FileSize,
-                UploadDate = file.UploadDate
+                return cachedFiles;
+            }
+
+            var filesMetadata = await _fileRepository.GetAllMetadataByDateAsync(startDate, endDate);
+
+            // Convert to DTO and generate pre-signed URLs
+            var filesDTO = filesMetadata.Select(file =>
+            {
+                string presignedUrl = null;
+                try
+                {
+                    // Generate the pre-signed URL for the file in S3
+                    var urlRequest = new GetPreSignedUrlRequest
+                    {
+                        BucketName = _bucketName,
+                        Key = file.FilePath,
+                        Expires = DateTime.UtcNow.AddMinutes(10) // Set expiration time for the URL
+                    };
+                    presignedUrl = _s3Client.GetPreSignedURL(urlRequest);
+                }
+                catch (Exception ex)
+                {
+                    // Log or handle exception if URL generation fails
+                    Console.WriteLine($"Error generating pre-signed URL for file {file.FileName}: {ex.Message}");
+                }
+
+                return new GetFileDTO
+                {
+                    FileId = file.Id,
+                    FileName = file.FileName,
+                    FileType = file.FileType,
+                    FilePath = file.FilePath,
+                    FileSize = file.FileSize,
+                    UploadDate = file.UploadDate,
+                    PreSignedUrl = presignedUrl
+                };
             }).ToList();
+
+            // Store the result in the cache with a sliding expiration of 30 seconds
+            _memoryCache.Set(cacheKey, filesDTO, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30),
+                SlidingExpiration = TimeSpan.FromSeconds(15)
+            });
+
+            return filesDTO;
         }
-
-        //public async Task<GetFileDTO> GetFileByIdAsync(int id)
-        //{
-        //    var metadata = await _fileRepository.GetMetadataByIdAsync(id);
-
-        //    if (metadata == null || !(await _fileStorageHelper.FileExistsAsync(metadata.FilePath)))
-        //        return null;
-
-        //    var fileStream = new FileStream(metadata.FilePath, FileMode.Open, FileAccess.Read);
-        //    return new GetFileDTO
-        //    {
-        //        FileStream = fileStream,
-        //        FileName = metadata.FileName
-        //    };
-        //}
 
         public async Task<GetFileDTO> GetFileByIdAsync(int id)
         {
             var metadata = await _fileRepository.GetMetadataByIdAsync(id);
 
-            if (metadata == null)
+            if ((metadata == null) || (!(await _fileStorageHelper.FileExistsInS3Async(metadata.FilePath))))
                 return null;
-
-            // Check if the file exists in S3
-            if (!(await _fileStorageHelper.FileExistsInS3Async(metadata.FilePath)))
-                return null;
-
-           ////Generate the pre - signed URL for the file in S3
-
-           //var urlRequest = new GetPreSignedUrlRequest
-           //{
-           //    BucketName = _bucketName,
-           //    Key = metadata.FilePath,
-           //    Expires = DateTime.UtcNow.AddMinutes(10) // Set the expiration time for the URL
-           //};
-           //var presignedUrl = _s3Client.GetPreSignedURL(urlRequest);
 
             var request = new GetObjectRequest
             {
                 BucketName = _bucketName,
                 Key = metadata.FilePath
             };
-
-            
-
             // Fetch the file from S3
             using (var response = await _s3Client.GetObjectAsync(request))
             {
@@ -254,12 +219,55 @@ namespace FileServer_POC.Services
                     FileType = metadata.FileType,
                     MemoryStream = memoryStream
                 };
-                //return File(memoryStream, response.Headers["Content-Type"], fileName);
+            }
+        }
+
+
+        public async Task<List<GetFileDTO>> GetAllFilesStreamAsync(string? filterOn = null, string? filterQuery = null)
+        {
+            var files = await _fileRepository.GetAllMetadataAsync(filterOn, filterQuery);
+
+            if (files == null || !files.Any())
+                return null;
+
+            var fileDTOs = new List<GetFileDTO>();
+
+            foreach (var file in files)
+            {
+                try
+                {
+                    var request = new GetObjectRequest
+                    {
+                        BucketName = _bucketName,
+                        Key = file.FilePath
+                    };
+
+                    // Fetch the file from S3
+                    using (var response = await _s3Client.GetObjectAsync(request))
+                    {
+                        var memoryStream = new MemoryStream();
+                        await response.ResponseStream.CopyToAsync(memoryStream);
+                        memoryStream.Position = 0; // Reset stream position for reading
+
+                        fileDTOs.Add(new GetFileDTO
+                        {
+                            FileId = file.Id,
+                            FileName = file.FileName,
+                            FileType = file.FileType,
+                            MemoryStream = memoryStream
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log or handle errors fetching files from S3
+                    Console.WriteLine($"Error fetching file from S3: {file.FilePath}, Exception: {ex.Message}");
+                }
             }
 
-            // Return the pre-signed URL
-            
+            return fileDTOs;
         }
+
 
         public async Task<FileOperationDTO> UpdateFileByIdAsync(int id, IFormFile file)
         {
@@ -280,10 +288,9 @@ namespace FileServer_POC.Services
                 
                 await DeleteFilesAsync([id]);
 
-                //var uploadDirPath = _fileStorageHelper.EnsureUploadDirectoryExists();
                 var errors = new List<FileErrorDTO>();
 
-                //await _fileStorageHelper.UpdateRegularFileAsync(file, uploadDirPath, errors, _fileMetadataHelper, metadata);
+                await _fileStorageHelper.UpdateRegularFileAsync(file, errors, _fileMetadataHelper, metadata);
               
                 return new FileOperationDTO
                 {
@@ -302,60 +309,8 @@ namespace FileServer_POC.Services
 
                 };
             }
-
-
-
         }
 
-        public async Task<FileOperationDTO> DeleteFilesAndMetadataAsync(int[] ids)
-        {
-            var filesToDelete = await _fileRepository.GetMetadataByIdsAsync(ids);
-            var result = new FileOperationDTO
-            {
-                Success = true,
-                Message = "All files deleted successfully."
-            };
-
-            foreach (var metadata in filesToDelete)
-            {
-                var fileDeleted = _fileStorageHelper.DeleteFile(metadata.FilePath, metadata.Id, result);
-                if (fileDeleted)
-                {
-                    await _fileMetadataHelper.DeleteMetadataAsync(metadata.Id, result);
-                }
-            }
-
-            if (result.Errors.Count > 0)
-            {
-                result.Success = false;
-                result.Message = "Partial success in file deletion.";
-            }
-
-            return result;
-        }
-
-        public async Task<FileOperationDTO> DeleteFilesAsync(int[] ids)
-        {
-            var filesToDelete = await _fileRepository.GetMetadataByIdsAsync(ids);
-            var result = new FileOperationDTO
-            {
-                Success = true,
-                Message = "All files deleted successfully."
-            };
-
-            foreach (var metadata in filesToDelete)
-            {
-                var fileDeleted = _fileStorageHelper.DeleteFile(metadata.FilePath, metadata.Id, result);
-            }
-
-            if (result.Errors.Count > 0)
-            {
-                result.Success = false;
-                result.Message = "Partial success in file deletion.";
-            }
-
-            return result;
-        }
 
         public async Task<FileOperationDTO> UpdateFileNameAndMetadataAsync(int id, string newFileName)
         {
@@ -369,19 +324,32 @@ namespace FileServer_POC.Services
                     Message = $"File with ID {id} not found!",
                 };
             }
-
             try
             {
-                // Rename the file in the storage
-                var directory = Path.GetDirectoryName(metadata.FilePath);
-                var newFilePath = Path.Combine(directory, newFileName);
+                newFileName += Path.GetExtension(metadata.FileName);
+                var uniqueFileName = $"{Guid.NewGuid()}_{newFileName}";
+                // Copy the file in S3 to the new name (renaming)
+                var copyRequest = new CopyObjectRequest
+                {
+                    SourceBucket = _bucketName,
+                    SourceKey = metadata.FilePath,
+                    DestinationBucket = _bucketName,
+                    DestinationKey = uniqueFileName
+                };
+                await _s3Client.CopyObjectAsync(copyRequest);
 
-                // Rename the file in the storage system
-                File.Move(metadata.FilePath, newFilePath);
+                // Delete the old file
+                var deleteRequest = new DeleteObjectRequest
+                {
+                    BucketName = _bucketName,
+                    Key = metadata.FilePath
+                };
+                await _s3Client.DeleteObjectAsync(deleteRequest);
 
-                // Update the metadata
+                // Update the metadata with the new file name
                 metadata.FileName = newFileName;
-                metadata.FilePath = newFilePath;
+                metadata.FileType = Path.GetExtension(metadata.FileName);
+                metadata.FilePath = uniqueFileName; // Use S3 key as the file path
 
                 await _fileRepository.UpdateMetadataAsync(metadata);
 
@@ -401,36 +369,82 @@ namespace FileServer_POC.Services
             }
         }
 
-        public async Task<List<GetFileDTO>> GetAllFilesByDateRangeAsync(DateTime? startDate = null, DateTime? endDate = null)
-        {
-            // Define a unique cache key based on the date range
-            var cacheKey = $"FilesByDateRange_{startDate?.ToString("yyyyMMdd") ?? "Start"}_{endDate?.ToString("yyyyMMdd") ?? "End"}";
 
-            if (_memoryCache.TryGetValue(cacheKey, out List<GetFileDTO> cachedFiles))
+        public async Task<FileOperationDTO> DeleteFilesAndMetadataAsync(int[] ids)
+        {
+            var filesToDelete = await _fileRepository.GetMetadataByIdsAsync(ids);
+            var result = new FileOperationDTO
             {
-                return cachedFiles;
+                Success = true,
+                Message = "All files deleted successfully."
+            };
+
+            if (filesToDelete==null || filesToDelete.Count == 0)
+            {
+                result.Success = false;
+                result.Message = "Could not find file metadata with given ids";
             }
 
-            var filesMetadata = await _fileRepository.GetAllMetadataByDateAsync(startDate, endDate);
-
-            // Convert the list of FileMetadata to GetFileDTO
-            var filesDTO = filesMetadata.Select(file => new GetFileDTO
+            foreach (var metadata in filesToDelete)
             {
-                FileId = file.Id,
-                FileName = file.FileName,
-                FileSize = file.FileSize,
-                FileType = file.FileType,
-                UploadDate = file.UploadDate
-            }).ToList();
+                var fileDeleted = await _fileStorageHelper.DeleteFileAsync(metadata.FilePath, metadata.Id, result);
+                if (fileDeleted)
+                {
+                    await _fileMetadataHelper.DeleteMetadataAsync(metadata.Id, result);
+                }
+                else
+                {
+                    break;
+                }
+            }
 
-            // Store the result in the cache with a sliding expiration of 30 seconds
-            _memoryCache.Set(cacheKey, filesDTO, new MemoryCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30),
-                SlidingExpiration = TimeSpan.FromSeconds(15)
-            });
+            if (result.Errors.Count > 0 || (ids.Length - filesToDelete.Count) > 0)
+{
+    // Add errors for IDs in the provided array that are not in filesToDelete
+    var validIds = filesToDelete.Select(f => f.Id).ToHashSet();
+    var invalidIds = ids.Where(id => !validIds.Contains(id));
 
-            return filesDTO;
+    foreach (var invalidId in invalidIds)
+    {
+        result.Errors.Add(new FileErrorDTO
+        {
+            FileId = invalidId,
+            ErrorMessage = "File metadata not found or invalid ID provided."
+        });
+    }
+
+    result.Success = false;
+    result.Message = "Partial success in file deletion.";
+}
+
+            return result;
         }
+
+        public async Task<FileOperationDTO> DeleteFilesAsync(int[] ids)
+        {
+            var filesToDelete = await _fileRepository.GetMetadataByIdsAsync(ids);
+            var result = new FileOperationDTO
+            {
+                Success = true,
+                Message = "All files deleted successfully."
+            };
+
+            foreach (var metadata in filesToDelete)
+            {
+                var fileDeleted = await _fileStorageHelper.DeleteFileAsync(metadata.FilePath, metadata.Id, result);
+            }
+
+            if (result.Errors.Count > 0)
+            {
+                result.Success = false;
+                result.Message = "Partial success in file deletion.";
+            }
+
+            return result;
+        }
+
+        
+
+        
     }
 }
