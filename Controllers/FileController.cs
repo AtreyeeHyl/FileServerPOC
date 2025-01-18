@@ -10,6 +10,7 @@ using Amazon.S3.Model;
 using Azure;
 using System.IO;
 using FileServer_POC.Models;
+using FileServer_POC.Services.Utilities;
 
 
 namespace FileServer_POC.Controllers
@@ -37,7 +38,7 @@ namespace FileServer_POC.Controllers
             if (files == null || files.Count == 0)
                 return BadRequest("No files uploaded.");
 
-            var result = await _fileService.UploadFilesAsync(files,string.Empty);
+            var result = await _fileService.UploadFilesAsync(files);
 
             if (!result.Success)
             {
@@ -59,7 +60,6 @@ namespace FileServer_POC.Controllers
             if (files == null || files.Count == 0)
                 return BadRequest("No files uploaded.");
 
-            // Buffer files in memory before starting the background task
             var bufferedFiles = files.Select(file => new BufferedFile
             {
                 FileName = file.FileName,
@@ -70,8 +70,9 @@ namespace FileServer_POC.Controllers
             // Trigger background upload
             _ = Task.Run(async () =>
             {
-                await _fileService.UploadBufferedFilesAsync(bufferedFiles, "Bulk/");
+                await _fileService.UploadBulkFilesAsync(bufferedFiles, "Bulk/");
             });
+
 
             // Return immediate response to the client
             return Ok(new { Message = "File upload initiated. You will receive a notification when the process is complete." });

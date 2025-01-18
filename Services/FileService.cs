@@ -44,7 +44,7 @@ namespace FileServer_POC.Services
             _bucketName = configuration["AWS:BucketName"];
         }
 
-        public async Task<FileOperationDTO> UploadFilesAsync(List<IFormFile> files, string? bucket_prefix)
+        public async Task<FileOperationDTO> UploadFilesAsync(List<IFormFile> files)
         {
             var errors = new List<FileErrorDTO>();
 
@@ -56,11 +56,11 @@ namespace FileServer_POC.Services
                 {
                     if (_fileValidationHelper.IsZipFile(file))
                     {
-                        await _zipProcessingHelper.ProcessZipFileAsync(file, errors,bucket_prefix);
+                        await _zipProcessingHelper.ProcessZipFileAsync(file, errors);
                     }
                     else
                     {
-                        await _fileStorageHelper.SaveFileToS3Async(file, errors, _fileMetadataHelper, bucket_prefix);
+                        await _fileStorageHelper.SaveFileToS3Async(file, errors, _fileMetadataHelper);
                     }
                 }
                 catch (Exception ex)
@@ -82,9 +82,11 @@ namespace FileServer_POC.Services
         }
 
 
-        public async Task<FileOperationDTO> UploadBufferedFilesAsync(List<BufferedFile> bufferedFiles, string bucket_prefix)
+        public async Task<FileOperationDTO> UploadBulkFilesAsync(List<BufferedFile> bufferedFiles, string bucket_prefix)
         {
             var result = new FileOperationDTO { Success = true, Errors = new List<FileErrorDTO>() };
+            // Buffer files in memory before starting the background task
+            
 
             foreach (var bufferedFile in bufferedFiles)
             {

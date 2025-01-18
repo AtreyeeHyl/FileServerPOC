@@ -7,8 +7,8 @@ namespace FileServer_POC.Services
 {
     public interface IFileService
     {
-        Task<FileOperationDTO> UploadFilesAsync(List<IFormFile> files, string? bucket_prefix);
-        Task<FileOperationDTO> UploadBufferedFilesAsync(List<BufferedFile> bufferedFiles, string prefix);
+        Task<FileOperationDTO> UploadFilesAsync(List<IFormFile> files);
+        Task<FileOperationDTO> UploadBulkFilesAsync(List<BufferedFile> files, string bucket_prefix);
         Task<List<GetFileDTO>> GetAllFilesAsync(string? filterOn = null, string? filterQuery = null);
         Task<List<GetFileDTO>> GetAllFilesStreamAsync(string? filterOn = null, string? filterQuery = null);
         Task<List<GetFileDTO>> GetAllFilesByDateRangeAsync(DateTime? startDate=null, DateTime? endDate=null);

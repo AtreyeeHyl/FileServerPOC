@@ -19,7 +19,7 @@ namespace FileServer_POC.Services.Utilities
             _bucketName = configuration["AWS:BucketName"]; // Read from appsettings.json
         }
 
-        public async Task SaveFileToS3Async(IFormFile file, List<FileErrorDTO> errors, FileMetadataHelper metadataHelper, string? bucket_prefix)
+        public async Task SaveFileToS3Async(IFormFile file, List<FileErrorDTO> errors, FileMetadataHelper metadataHelper)
         {
             try
             {
@@ -31,7 +31,7 @@ namespace FileServer_POC.Services.Utilities
                 }
 
                 // Generate a unique key for the file in S3
-                var uniqueKey = $"{bucket_prefix}{Guid.NewGuid()}_{file.FileName}";
+                var uniqueKey = $"{Guid.NewGuid()}_{file.FileName}";
 
                 //Upload the file to S3
                 using (var stream = file.OpenReadStream())
@@ -219,6 +219,7 @@ namespace FileServer_POC.Services.Utilities
         }
 
         
+
 
     }
 }
