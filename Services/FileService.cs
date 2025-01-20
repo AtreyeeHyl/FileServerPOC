@@ -103,11 +103,7 @@ namespace FileServer_POC.Services
                         InputStream = bufferedFile.Content,
                         ContentType = bufferedFile.ContentType
                     };
-
                     await _s3Client.PutObjectAsync(uploadRequest);
-
-                    // Optionally save metadata for the uploaded file
-                    await _fileMetadataHelper.CreateAndSaveFileMetadataAsync(bufferedFile.FileName, uniqueKey, bufferedFile.Content.Length);
                 }
                 catch (Exception ex)
                 {
