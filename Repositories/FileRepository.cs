@@ -84,7 +84,8 @@ namespace FileServer_POC.Repositories
             if (!await _context.FileMetadata.AnyAsync())
             {
                 // Reset the identity seed for the FileMetadata table
-                await _context.Database.ExecuteSqlRawAsync("DBCC CHECKIDENT ('FileMetadata', RESEED, 0);");
+                //await _context.Database.ExecuteSqlRawAsync("DBCC CHECKIDENT ('FileMetadata', RESEED, 0);");
+                await _context.Database.ExecuteSqlRawAsync("ALTER TABLE FileMetadata AUTO_INCREMENT = 1;");
             }
 
         }

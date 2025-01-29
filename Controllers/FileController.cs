@@ -7,7 +7,6 @@ using System.IO.Compression;
 using System.Text.Json;
 using FileServer_POC.DTOs;
 using Amazon.S3.Model;
-using Azure;
 using System.IO;
 using FileServer_POC.Models;
 using FileServer_POC.Services.Utilities;

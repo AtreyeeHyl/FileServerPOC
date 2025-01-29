@@ -7,5 +7,6 @@ namespace FileServer_POC.Entities
     {
         public ApplicationDbContext(DbContextOptions options) : base(options) { }
         public DbSet<FileMetadata> FileMetadata { get; set; }
+
     }
 }

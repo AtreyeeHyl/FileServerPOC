@@ -11,7 +11,6 @@ using Microsoft.Extensions.Caching.Memory;
 using Amazon.S3;
 using Microsoft.Extensions.Configuration;
 using Amazon.S3.Model;
-using Azure.Core;
 using Amazon.Runtime.Internal;
 using System.Reflection.Metadata;
 using FileServer_POC.Models;
