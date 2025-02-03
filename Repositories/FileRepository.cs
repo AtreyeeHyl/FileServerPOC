@@ -27,6 +27,8 @@ namespace FileServer_POC.Repositories
                 {
                     "filename" => query.Where(file => file.FileName != null &&
                                                       EF.Functions.Like(file.FileName, $"%{filterQuery}%")),
+                    "filepath" => query.Where(file => file.FilePath != null &&
+                                          EF.Functions.Like(file.FilePath, $"%{filterQuery}%")),
                     "filesize" => int.TryParse(filterQuery, out var maxSize)
                         ? query.Where(file => file.FileSize <= maxSize)
                         : query, // If parsing fails, no filtering for filesize

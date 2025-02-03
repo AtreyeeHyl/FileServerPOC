@@ -77,30 +77,6 @@ namespace FileServer_POC.Controllers
             return Ok(new { Message = "File upload initiated. You will receive a notification when the process is complete." });
         }
 
-        ////Bulk upload
-        //[HttpPost]
-        //[Route("UploadFilesBulk")]
-        //public async Task<IActionResult> UploadFilesBulk([FromForm] List<IFormFile> files)
-        //{
-        //    if (files == null || files.Count == 0)
-        //        return BadRequest("No files uploaded.");
-
-        //    var result = await _fileService.UploadFilesAsync(files, "Bulk/");
-
-        //    if (!result.Success)
-        //    {
-        //        return StatusCode(StatusCodes.Status207MultiStatus, new
-        //        {
-        //            Message = "Partial success in file upload.",
-        //            Errors = result.Errors
-        //        });
-        //    }
-
-        //    return Ok(new { Message = "All files uploaded successfully." });
-        //}
-
-
-
 
         //Get Multiple Files Details Using Filters
         [HttpGet]

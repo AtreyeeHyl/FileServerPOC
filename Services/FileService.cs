@@ -127,15 +127,6 @@ namespace FileServer_POC.Services
 
 
 
-
-
-
-
-
-
-
-
-
         public async Task<List<GetFileDTO>> GetAllFilesAsync(string? filterOn = null, string? filterQuery = null)
         {
             // Create a unique cache key based on filters
