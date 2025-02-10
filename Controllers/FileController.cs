@@ -77,6 +77,7 @@ namespace FileServer_POC.Controllers
             return Ok(new { Message = "File upload initiated. You will receive a notification when the process is complete." });
         }
 
+        
 
         //Get Multiple Files Details Using Filters
         [HttpGet]
@@ -179,7 +180,7 @@ namespace FileServer_POC.Controllers
 
             if (!result.Success)
             {
-                return StatusCode(StatusCodes.Status207MultiStatus, new
+                return StatusCode(StatusCodes.Status500InternalServerError, new
                 {
                     Message = "Could not update file.",
                     Errors = result.Message
@@ -203,7 +204,7 @@ namespace FileServer_POC.Controllers
 
             if (!result.Success)
             {
-                return StatusCode(StatusCodes.Status207MultiStatus, new
+                return StatusCode(StatusCodes.Status500InternalServerError, new
                 {
                     Message = "Could not update file name.",
                     Errors = result.Message
