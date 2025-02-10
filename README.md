@@ -65,4 +65,6 @@ For RDS Setup ---------------------------
     "ConnectionStrings": {
         "DefaultConnection": "Server=file-server-db.cx644oceaozv.eu-north-1.rds.amazonaws.com,3306;Database=fileServerDB;User Id=your-user;Password=your-password;"
      }
-3. 
+
+
+Link for Documentation page - https://hyland.atlassian.net/l/cp/bu13P8Ak
